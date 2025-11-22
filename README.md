@@ -1,1 +1,79 @@
-# Envy-Free Room Allocation\n\n![Python](https://img.shields.io/badge/python-3.8+-blue.svg)\n![License](https://img.shields.io/badge/license-MIT-green.svg)\n\n## Overview\n\nThis project implements an **Envy-Free Room Allocation** algorithm for the classic \"Rent Division\" problem in Fair Division theory. The algorithm ensures that when multiple people share an apartment, each person is assigned a room and pays a price such that no one envies another person's room-price combination.\n\n## Algorithm\n\nThe implementation uses a two-phase approach:\n\n### Phase A: Assignment (Maximizing Social Welfare)\n- Models the problem as a **Maximum Weight Perfect Matching** in a bipartite graph\n- Players are matched to rooms to maximize total value\n- Uses `scipy.optimize.linear_sum_assignment`\n\n### Phase B: Pricing (Eliminating Envy)\n1. Constructs an **Envy Graph** where edge weights represent envy between players\n2. Uses **Bellman-Ford algorithm** to find longest paths (subsidies)\n3. Calculates final prices using the formula:\n   ```\n   Price(room_i) = (R + S) / n - q_i\n   ```\n   where:\n   - `R` = total rent\n   - `S` = sum of subsidies\n   - `n` = number of players\n   - `q_i` = subsidy for player i\n\n## Mathematical Guarantee\n\nThe algorithm ensures **envy-freeness**: For every pair of players i and j:\n\n```\nutility_i(room_i) ≥ utility_i(room_j)\n```\n\nwhere `utility = value - price`\n\n## Installation\n\n```bash\npip install numpy scipy\n```\n\n## Usage\n\n```python\nfrom envy_free_allocation import envy_free_room_allocation, print_allocation\n\n# Define player valuations for rooms\nvaluations = [\n    [35, 40, 25],  # Player 0's values for rooms 0, 1, 2\n    [35, 60, 40],  # Player 1's values\n    [25, 40, 20]   # Player 2's values\n]\n\nrent = 100  # Total rent to divide\n\n# Calculate allocation\nassignment, pricing = envy_free_room_allocation(valuations, rent)\n\n# Display results\nprint_allocation(valuations, assignment, pricing)\n```\n\n## Example Output\n\n```\nPlayer 0 gets room 1 with value 40, and pays 38.333333333333336\nPlayer 1 gets room 2 with value 40, and pays 26.666666666666664\nPlayer 2 gets room 0 with value 25, and pays 35.0\n```\n\n## Test Cases\n\nThe implementation includes comprehensive unit tests:\n\n### Test Case 1: Free-Rider Problem\n```python\nvaluations = [[150, 0], [140, 10]]\nrent = 100\n```\nDemonstrates that a player with low valuations receives a **negative price** (subsidy).\n\n### Test Case 2: Standard 3-Player Example\n```python\nvaluations = [[35, 40, 25], [35, 60, 40], [25, 40, 20]]\nrent = 100\n```\nVerifies envy-freeness in a balanced scenario.\n\n## Running Tests\n\n```bash\npython envy_free_allocation.py\n```\n\nTests verify:\n1. ✓ Sum of prices equals total rent\n2. ✓ No player envies another (envy-freeness property)\n3. ✓ Negative pricing in free-rider scenarios\n\n## Theory\n\nThis implementation is based on research in Fair Division and Game Theory:\n\n- **Graph Theory**: Maximum weight matching, longest paths in directed graphs\n- **Fair Division**: Envy-freeness, proportionality, Pareto efficiency\n- **Algorithms**: Bellman-Ford for handling negative edge weights\n\n## Key Features\n\n- ✅ Mathematically proven envy-free allocation\n- ✅ Handles free-rider problems with subsidies\n- ✅ Efficient O(n³) complexity\n- ✅ Comprehensive test suite\n- ✅ Clear documentation and comments\n\n## Algorithm Complexity\n\n- **Phase A (Matching)**: O(n³) using Hungarian algorithm\n- **Phase B (Pricing)**: O(n³) for Bellman-Ford from each node\n- **Overall**: O(n³)\n\n## License\n\nMIT License - see LICENSE file for details\n\n## References\n\n- Algorithms for Fair Division (Game Theory)\n- Maximum Weight Matching in Bipartite Graphs\n- Bellman-Ford Algorithm for Longest Paths\n\n## Contributing\n\nContributions are welcome! Please feel free to submit a Pull Request.\n\n## Author\n\nImplemented as part of Fair Division algorithms study.\n
+# אלגוריתם חלוקת חדרים ללא קנאה (Envy-Free Room Allocation)
+
+פרויקט זה מממש פתרון אלגוריתמי לבעיית "חלוקת שכר דירה" (Rent Division). המטרה היא להקצות חדרים לשותפים ולקבוע את המחיר שכל שותף ישלם, כך שסכום התשלומים יכסה בדיוק את שכר הדירה הכולל, והחלוקה תהיה **ללא קנאה** (Envy-Free).
+
+## 📌 הגדרת הבעיה
+
+נתונה דירה עם $n$ חדרים ו-$n$ שותפים, וסכום שכירות כולל $R$. לכל שותף יש הערכה כספית (Valuation) סובייקטיבית לכל חדר.
+אנו מניחים שהשותפים הם **קוואזיליניאריים** (Quasilinear), כלומר התועלת של שותף $i$ מחדר $j$ במחיר $p_j$ היא הערך שהוא מייחס לחדר פחות המחיר שעליו לשלם:
+
+$$Utility_i = Value_i(Room_j) - p_j$$
+
+**האתגר:** למצוא השמה $X$ (מי מקבל איזה חדר) ווקטור מחירים $p$ כך שיתקיימו שני תנאים:
+
+1. סכום המחירים שווה לשכר הדירה הכולל ($R$).
+2. **ללא קנאה:** אף שותף לא מעדיף את החבילה (חדר + מחיר) שקיבל שותף אחר.
+
+## 💻 ממשק הקוד (Required Interface)
+
+בהתאם לדרישות המטלה, המימוש מתבצע בפייתון והפונקציה המרכזית נכתבה לפי החתימה הבאה:
+
+```python
+def envy_free_room_allocation(valuations: list[list[float]], rent: float) -> tuple[dict, dict]:
+    """
+    Calculates an envy-free allocation of rooms and prices.
+    Input:
+        valuations: Matrix where row i is player i's value for each room.
+        rent: Total rent sum.
+    Output:
+        Returns assignment and pricing dictionaries.
+    """
+    # Implementation...
+```
+
+## 💡 הפתרון האלגוריתמי
+
+הפתרון מבוסס על המשפט הקובע כי השמה הממקסמת את סכום הערכים (Social Welfare) היא תנאי הכרחי ומספיק לקיום תמחור ללא קנאה. האלגוריתם פועל בשני שלבים:
+
+### שלב א': השמה (Assignment)
+
+מציאת השמה שממקסמת את סכום הערכים של כל השחקנים יחד.
+
+* **המימוש:** הבעיה ממומלת כבעיית שידוך בגרף דו-צדדי ממושקל (Maximum Weight Perfect Matching).
+* **טכנולוגיה:** שימוש בפונקציה `linear_sum_assignment` (מתוך ספריית `scipy`) או באלגוריתם דומה למציאת שידוך אופטימלי.
+
+### שלב ב': תמחור (Pricing)
+
+חישוב המחירים כך שאף שחקן לא יקנא.
+
+1. **גרף הקנאה:** בניית גרף מכוון בו כל צומת הוא שחקן, ומשקל הקשת מ-$i$ ל-$j$ הוא רמת הקנאה של $i$ ב-$j$ תחת ההשמה הנוכחית.
+2. **חישוב סובסידיות:** מכיוון שההשמה אופטימלית, מובטח שבגרף אין מעגלים חיוביים. אנו מחשבים את **המסלול הכבד ביותר** (Longest Path) מכל צומת באמצעות אלגוריתם **Bellman-Ford** (או וריאציה המתאימה למשקלים בגרף ללא מעגלים חיוביים).
+3. **קביעת המחיר הסופי:** ערך המסלול הכבד ביותר מגדיר את ה"סובסידיה" לכל שחקן. המחיר הסופי נקבע על ידי קיזוז הגירעון שנוצר מהסובסידיות שווה בשווה בין כל השחקנים.
+
+## 🧪 בדיקות ותוצאות (Testing & Verification)
+
+הקוד נבדק על מקרי קצה ומקרים סטנדרטיים כדי לוודא נכונות מתמטית. להלן ניתוח התוצאות:
+
+### 1. מקרה "הטרמפיסט" (The Free-Rider Problem)
+
+במקרה זה נבדקה סיטואציה קיצונית בה שחקן אחד מעריך את החדרים בסכום גבוה משמעותית מהשני.
+
+* **הקלט:** `valuations = [[150, 0], [140, 10]]`, `rent = 100`.
+* **התוצאה שהתקבלה:** השחקן השני משלם מחיר **שלילי** (כלומר, מקבל כסף, כ-15-), בעוד השחקן הראשון משלם יותר מסך השכירות (115).
+* **ניתוח:** תוצאה זו תואמת בדיוק את התיאוריה. כדי למנוע קנאה, השחקן שקיבל את החדר הפחות רצוי חייב לקבל פיצוי משמעותי ("סבסוד"), מה שמוביל למחיר שלילי.
+
+### 2. המקרה הסטנדרטי
+
+נבדקה דוגמה קלאסית עם 3 שותפים ו-3 חדרים.
+
+* **התוצאה שהתקבלה:** המחירים חושבו כ-33.33, 43.33 ו-23.33 (בקירוב).
+* **ניתוח:** סכום המחירים הוא בדיוק 100. בדיקה הראתה שעבור כל שחקן מתקיים תנאי האי-קנאה. תוצאה זו זהה לפתרון האגליטרי המופיע במקורות, מה שמעיד על דיוק החישוב.
+
+## 🚀 הרצה
+
+הפרויקט דורש את הספריות `numpy` ו-`scipy` (לחישוב השידוך).
+ניתן להריץ את הקובץ הראשי כדי לראות את הפלט של הדוגמאות:
+
+```bash
+python envy_free_allocation.py
+```\n
