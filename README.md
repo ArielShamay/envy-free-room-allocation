@@ -1,36 +1,56 @@
 
+
 # אלגוריתם חלוקת חדרים ללא קנאה (Envy-Free Room Allocation)
 
 פרויקט זה מממש פתרון אלגוריתמי לבעיית "חלוקת שכר דירה" (Rent Division). המטרה היא להקצות חדרים לשותפים ולקבוע את המחיר שכל שותף ישלם, כך שסכום התשלומים יכסה בדיוק את שכר הדירה הכולל, והחלוקה תהיה **ללא קנאה** (Envy-Free).
 
 ## 📌 הגדרת הבעיה
 
-נתונה דירה עם $n$ חדרים ו-$n$ שותפים, וסכום שכירות כולל $R$. לכל שותף יש הערכה כספית (Valuation) סובייקטיבית לכל חדר. אנו מניחים שהשותפים הם **קוואזיליניאריים** (Quasilinear), כלומר התועלת של שותף $i$ מחדר $j$ במחיר $p_j$ היא:
-$$Utility_{i} = Value_{i}(Room_{j}) - p_{j}$$
+נתונה דירה עם $n$ חדרים ו-$n$ שותפים, וסכום שכירות כולל $R$. לכל שותף יש הערכה כספית (Valuation) סובייקטיבית לכל חדר.
+אנו מניחים שהשותפים הם **קוואזיליניאריים** (Quasilinear), כלומר התועלת של שותף $i$ מחדר $j$ במחיר $p_j$ היא הערך שהוא מייחס לחדר פחות המחיר שעליו לשלם:
 
-**האתגר:** למצוא השמה $X$ (מי מקבל איזה חדר) ווקטור מחירים $p$ כך ש:
+$$Utility_i = Value_i(Room_j) - p_j$$
 
-1.  $\sum p_j = R$ (המחירים מכסים את השכירות).
-2.  [cite\_start]אף שותף לא מעדיף את החבילה (חדר + מחיר) של שותף אחר [cite: 729-730].
+**האתגר:** למצוא השמה $X$ (מי מקבל איזה חדר) ווקטור מחירים $p$ כך שיתקיימו שני תנאים:
+
+1.  סכום המחירים שווה לשכר הדירה הכולל ($R$).
+2.  [cite\_start]**ללא קנאה:** אף שותף לא מעדיף את החבילה (חדר + מחיר) שקיבל שותף אחר[cite: 285].
+
+## 💻 ממשק הקוד (Required Interface)
+
+[cite\_start]בהתאם לדרישות המטלה, המימוש מתבצע בפייתון והפונקציה המרכזית נכתבה לפי החתימה הבאה [cite: 650-651]:
+
+```python
+def envy_free_room_allocation(valuations: list[list[float]], rent: float) -> tuple[dict, dict]:
+    """
+    Calculates an envy-free allocation of rooms and prices.
+    Input:
+        valuations: Matrix where row i is player i's value for each room.
+        rent: Total rent sum.
+    Output:
+        Returns assignment and pricing dictionaries.
+    """
+    # Implementation...
+```
 
 ## 💡 הפתרון האלגוריתמי
 
-[cite\_start]הפתרון מבוסס על המשפט הקובע כי השמה הממקסמת את סכום הערכים (Social Welfare) היא תנאי הכרחי ומספיק לקיום תמחור ללא קנאה[cite: 938]. האלגוריתם פועל בשני שלבים:
+[cite\_start]הפתרון מבוסס על המשפט הקובע כי השמה הממקסמת את סכום הערכים (Social Welfare) היא תנאי הכרחי ומספיק לקיום תמחור ללא קנאה [cite: 449-450]. האלגוריתם פועל בשני שלבים:
 
 ### שלב א': השמה (Assignment)
 
 מציאת השמה שממקסמת את סכום הערכים של כל השחקנים יחד.
 
-  * **המימוש:** הבעיה ממומלת כבעיית שידוך בגרף דו-צדדי ממושקל (Bipartite Matching).
-  * [cite\_start]**טכנולוגיה:** שימוש ב-`scipy.optimize.linear_sum_assignment` (או המקביל ל"אלגוריתם ההונגרי") למציאת **Maximum Weight Perfect Matching**[cite: 963, 998].
+  * [cite\_start]**המימוש:** הבעיה ממומלת כבעיית שידוך בגרף דו-צדדי ממושקל (Maximum Weight Perfect Matching) [cite: 462-464].
+  * **טכנולוגיה:** שימוש בפונקציה `linear_sum_assignment` (מתוך ספריית `scipy`) או באלגוריתם דומה למציאת שידוך אופטימלי.
 
 ### שלב ב': תמחור (Pricing)
 
 חישוב המחירים כך שאף שחקן לא יקנא.
 
-  * [cite\_start]**גרף הקנאה:** בניית גרף מכוון בו כל צומת הוא שחקן, ומשקל הקשת $i \to j$ הוא רמת הקנאה של $i$ ב-$j$ תחת ההשמה הנוכחית [cite: 881-882].
-  * **חישוב סובסידיות:** מכיוון שההשמה אופטימלית, מובטח שבגרף אין מעגלים חיוביים. [cite\_start]אנו מחשבים את **המסלול הכבד ביותר** (Longest Path) מכל צומת, המסומן ב-$q_i$ (סובסידיה) [cite: 917-918]. החישוב מתבצע באמצעות אלגוריתם **Bellman-Ford** (על משקלים שליליים).
-  * [cite\_start]**קביעת המחיר הסופי:** המחיר לכל חדר נקבע על ידי חלוקת ה"גירעון" שנוצר מהסובסידיות שווה בשווה בין כל השחקנים, כך שסכום המחירים הסופי יהיה $R$[cite: 932].
+1.  [cite\_start]**גרף הקנאה:** בניית גרף מכוון בו כל צומת הוא שחקן, ומשקל הקשת מ-$i$ ל-$j$ הוא רמת הקנאה של $i$ ב-$j$ תחת ההשמה הנוכחית [cite: 381-382].
+2.  [cite\_start]**חישוב סובסידיות:** מכיוון שההשמה אופטימלית, מובטח שבגרף אין מעגלים חיוביים[cite: 430]. [cite\_start]אנו מחשבים את **המסלול הכבד ביותר** (Longest Path) מכל צומת באמצעות אלגוריתם **Bellman-Ford** (או וריאציה המתאימה למשקלים בגרף ללא מעגלים חיוביים) [cite: 497-498].
+3.  **קביעת המחיר הסופי:** ערך המסלול הכבד ביותר מגדיר את ה"סובסידיה" לכל שחקן. [cite\_start]המחיר הסופי נקבע על ידי קיזוז הגירעון שנוצר מהסובסידיות שווה בשווה בין כל השחקנים[cite: 423, 499].
 
 ## 🧪 בדיקות ותוצאות (Testing & Verification)
 
@@ -38,29 +58,24 @@ $$Utility_{i} = Value_{i}(Room_{j}) - p_{j}$$
 
 ### 1\. מקרה "הטרמפיסט" (The Free-Rider Problem)
 
-במקרה זה נבדקה סיטואציה קיצונית בה שחקן אחד מעריך את החדרים בסכום גבוה משמעותית מהשני, והשני מעריך אותם בערך נמוך מאוד (קרוב ל-0).
+במקרה זה נבדקה סיטואציה קיצונית בה שחקן אחד מעריך את החדרים בסכום גבוה משמעותית מהשני.
 
-  * **קלט:** `valuations = [[150, 0], [140, 10]]`, `rent = 100`.
-  * **תוצאה שהתקבלה:** השחקן השני משלם מחיר **שלילי** (מקבל כסף, כ-15-), בעוד השחקן הראשון משלם יותר מסך השכירות (115).
-  * [cite\_start]**ניתוח:** תוצאה זו תואמת בדיוק את התיאוריה [cite: 1021-1028]. כדי למנוע מהשחקן השני לקנא בשחקן הראשון (שקיבל את החדר הטוב), ההפרש במחירים חייב להיות גדול, מה שמחייב תשלום שלילי ("סבסוד") לשחקן שקיבל את החדר הגרוע. זהו אימות קריטי לכך שהאלגוריתם לא "מפחד" ממחירים שליליים ומטפל נכון באילוצי קנאה קשיחים.
+  * **הקלט:** `valuations = [[150, 0], [140, 10]]`, `rent = 100`.
+  * **התוצאה שהתקבלה:** השחקן השני משלם מחיר **שלילי** (כלומר, מקבל כסף, כ-15-), בעוד השחקן הראשון משלם יותר מסך השכירות (115).
+  * [cite\_start]**ניתוח:** תוצאה זו תואמת בדיוק את התיאוריה [cite: 571-573]. כדי למנוע קנאה, השחקן שקיבל את החדר הפחות רצוי חייב לקבל פיצוי משמעותי ("סבסוד"), מה שמוביל למחיר שלילי.
 
-### 2\. המקרה הסטנדרטי (Standard Example)
+### 2\. המקרה הסטנדרטי
 
-נבדקה דוגמה קלאסית עם 3 שותפים ו-3 חדרים בעלי ערכים מגוונים.
+נבדקה דוגמה קלאסית עם 3 שותפים ו-3 חדרים.
 
-  * **קלט:** `valuations` לפי הטבלה בכיתה, `rent = 100`.
-  * **תוצאה שהתקבלה:**
-      * Player 0: משלם \~33.33
-      * Player 1: משלם \~43.33
-      * Player 2: משלם \~23.33
-  * **ניתוח:** סכום המחירים הוא בדיוק 100. בדיקה ידנית מאשרת שעבור כל שחקן, הערך פחות המחיר (התועלת) גבוה או שווה לתועלת שהיה מקבל מכל חדר אחר. [cite\_start]תוצאה זו זהה לפתרון האגליטרי המופיע במקורות[cite: 332], מה שמעיד על דיוק החישוב של המסלולים הכבדים בגרף.
+  * **התוצאה שהתקבלה:** המחירים חושבו כ-33.33, 43.33 ו-23.33 (בקירוב).
+  * **ניתוח:** סכום המחירים הוא בדיוק 100. בדיקה הראתה שעבור כל שחקן מתקיים תנאי האי-קנאה. [cite\_start]תוצאה זו זהה לפתרון האגליטרי המופיע במקורות[cite: 517], מה שמעיד על דיוק החישוב.
 
-## 🚀 איך להריץ
+## 🚀 הרצה
 
-הפרויקט כתוב ב-Python ודורש את הספריות `numpy`, `scipy` (אופציונלי לשידוך), ו-`networkx` (לניהול הגרף).
+הפרויקט דורש את הספריות `numpy` ו-`scipy` (לחישוב השידוך).
+ניתן להריץ את הקובץ הראשי כדי לראות את הפלט של הדוגמאות:
 
 ```bash
 python envy_free_allocation.py
 ```
-
-הפלט יציג את ההשמה הנבחרת ואת המחיר המחושב לכל חדר, יחד עם אימות (Assertion) שהפתרון הוא אכן Envy-Free.
